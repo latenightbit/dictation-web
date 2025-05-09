@@ -9,7 +9,7 @@ import {GoogleGenAI} from '@google/genai';
 // @ts-ignore
 import {marked} from 'marked';
 
-const MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
+const MODEL_NAME = 'gemini-2.0-flash-lite';
 
 interface Note {
   id: string;
@@ -71,7 +71,6 @@ class VoiceNotesApp {
     if (storedApiKey) {
       this.genAI = new GoogleGenAI({
         apiKey: storedApiKey,
-        apiVersion: 'v1alpha',
       });
     } else {
       // Without an API key, we'll initialize with a placeholder that will prompt for a key
@@ -718,36 +717,31 @@ class VoiceNotesApp {
       
       this.recordingStatus.textContent = 'Getting transcription...';
 
-      const contents = [
-        {text: '"Please transcribe the following audio verbatim. Provide only the text content."'},
-        {inlineData: {mimeType: mimeType, data: base64Audio}},
-      ];
+      // Get the model
+      const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
       
-      console.log('Sending transcription request to Google Gemini API');
-      console.log('Using model:', MODEL_NAME);
+      // Setup prompt for audio transcription
+      const prompt = "Transcribe this audio file verbatim, include all spoken words.";
+      
+      // Create audio part with the proper MIME type
+      console.log('Creating content parts for the transcription request');
+      const audioData = { data: base64Audio, mimeType };
       
       try {
-        const response = await this.genAI.models.generateContent({
-          model: MODEL_NAME,
-          contents: contents,
-        });
+        console.log('Sending transcription request to Gemini API');
+        // Send request using the generative model API
+        const result = await model.generateContent([prompt, audioData]);
+        const response = await result.response;
+        console.log('Transcription API response received');
         
-        console.log('Transcription response received:', response);
-        const transcriptionText = response.text;
+        // Get the text from the response
+        const transcriptionText = response.text();
         console.log('Transcription text:', transcriptionText ? transcriptionText.substring(0, 100) + '...' : 'null');
 
-        if (transcriptionText) {
+        if (transcriptionText && transcriptionText.trim()) {
           this.rawTranscription.textContent = transcriptionText;
-          if (transcriptionText.trim() !== '') {
-            this.rawTranscription.classList.remove('placeholder-active');
-            console.log('Transcription complete - content added to UI');
-          } else {
-            const placeholder =
-              this.rawTranscription.getAttribute('placeholder') || '';
-            this.rawTranscription.textContent = placeholder;
-            this.rawTranscription.classList.add('placeholder-active');
-            console.log('Transcription returned empty string');
-          }
+          this.rawTranscription.classList.remove('placeholder-active');
+          console.log('Transcription complete - content added to UI');
 
           if (this.currentNote)
             this.currentNote.rawTranscription = transcriptionText;
@@ -767,7 +761,7 @@ class VoiceNotesApp {
           this.polishedNote.innerHTML =
             '<p><em>Could not transcribe audio. Please try again.</em></p>';
           this.rawTranscription.textContent =
-            this.rawTranscription.getAttribute('placeholder');
+            this.rawTranscription.getAttribute('placeholder') || '';
           this.rawTranscription.classList.add('placeholder-active');
         }
       } catch (apiError) {
@@ -785,7 +779,7 @@ class VoiceNotesApp {
         'Error getting transcription. Please try again.';
       this.polishedNote.innerHTML = `<p><em>Error during transcription: ${error instanceof Error ? error.message : String(error)}</em></p>`;
       this.rawTranscription.textContent =
-        this.rawTranscription.getAttribute('placeholder');
+        this.rawTranscription.getAttribute('placeholder') || '';
       this.rawTranscription.classList.add('placeholder-active');
       this.isProcessing = false; // Make sure to reset processing flag on error
     }
@@ -1043,7 +1037,6 @@ class VoiceNotesApp {
       // Initialize the API client with the new key
       this.genAI = new GoogleGenAI({
         apiKey: apiKey,
-        apiVersion: 'v1alpha',
       });
       
       // Update UI
