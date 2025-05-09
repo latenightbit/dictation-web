@@ -50,10 +50,21 @@ class VoiceNotesApp {
   // New properties for file upload
   private uploadButton: HTMLButtonElement;
   private audioFileInput: HTMLInputElement;
+  
+  // API Key related properties
+  private settingsButton: HTMLButtonElement;
+  private apiKeyModal: HTMLDivElement;
+  private closeModalButton: HTMLElement;
+  private apiKeyInput: HTMLInputElement;
+  private saveApiKeyButton: HTMLButtonElement;
+  private clearApiKeyButton: HTMLButtonElement;
+  private apiKeyStatus: HTMLElement;
 
   constructor() {
+    // Initialize with stored API key or fallback to env variable
+    const storedApiKey = localStorage.getItem('gemini_api_key');
     this.genAI = new GoogleGenAI({
-      apiKey: process.env.API_KEY!,
+      apiKey: storedApiKey || process.env.API_KEY!,
       apiVersion: 'v1alpha',
     });
 
@@ -100,6 +111,29 @@ class VoiceNotesApp {
     this.audioFileInput = document.getElementById(
       'audioFileInput'
     ) as HTMLInputElement;
+    
+    // Initialize API key modal elements
+    this.settingsButton = document.getElementById(
+      'settingsButton'
+    ) as HTMLButtonElement;
+    this.apiKeyModal = document.getElementById(
+      'apiKeyModal'
+    ) as HTMLDivElement;
+    this.closeModalButton = document.querySelector(
+      '.close-modal'
+    ) as HTMLElement;
+    this.apiKeyInput = document.getElementById(
+      'apiKeyInput'
+    ) as HTMLInputElement;
+    this.saveApiKeyButton = document.getElementById(
+      'saveApiKeyButton'
+    ) as HTMLButtonElement;
+    this.clearApiKeyButton = document.getElementById(
+      'clearApiKeyButton'
+    ) as HTMLButtonElement;
+    this.apiKeyStatus = document.getElementById(
+      'apiKeyStatus'
+    ) as HTMLElement;
 
     if (this.liveWaveformCanvas) {
       this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
@@ -134,6 +168,22 @@ class VoiceNotesApp {
     // Add event listeners for file upload
     this.uploadButton.addEventListener('click', () => this.audioFileInput.click());
     this.audioFileInput.addEventListener('change', (event) => this.handleFileUpload(event));
+    
+    // Add event listeners for API key modal
+    this.settingsButton.addEventListener('click', () => this.openApiKeyModal());
+    this.closeModalButton.addEventListener('click', () => this.closeApiKeyModal());
+    this.saveApiKeyButton.addEventListener('click', () => this.saveApiKey());
+    this.clearApiKeyButton.addEventListener('click', () => this.clearApiKey());
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (event) => {
+      if (event.target === this.apiKeyModal) {
+        this.closeApiKeyModal();
+      }
+    });
+    
+    // Check and display current API key status
+    this.updateApiKeyStatus();
   }
 
   private handleResize(): void {
@@ -817,6 +867,97 @@ class VoiceNotesApp {
     } catch (error) {
       console.error('Error processing uploaded audio:', error);
       this.recordingStatus.textContent = 'Error processing the audio file. Please try again.';
+    }
+  }
+
+  private openApiKeyModal(): void {
+    if (this.apiKeyModal) {
+      // Check if there's an existing API key and pre-fill the input
+      const storedApiKey = localStorage.getItem('gemini_api_key');
+      if (storedApiKey) {
+        this.apiKeyInput.value = storedApiKey;
+      }
+      
+      // Display the modal
+      this.apiKeyModal.style.display = 'block';
+    }
+  }
+
+  private closeApiKeyModal(): void {
+    if (this.apiKeyModal) {
+      this.apiKeyModal.style.display = 'none';
+    }
+  }
+
+  private saveApiKey(): void {
+    const apiKey = this.apiKeyInput.value.trim();
+    
+    if (!apiKey) {
+      this.apiKeyStatus.textContent = 'API key cannot be empty.';
+      this.apiKeyStatus.style.color = 'var(--color-recording)';
+      return;
+    }
+    
+    try {
+      // Save the API key to localStorage
+      localStorage.setItem('gemini_api_key', apiKey);
+      
+      // Update the GenAI client with the new key
+      this.genAI = new GoogleGenAI({
+        apiKey: apiKey,
+        apiVersion: 'v1alpha',
+      });
+      
+      // Update status and close modal
+      this.apiKeyStatus.textContent = 'API key saved successfully! Reload to apply changes.';
+      this.apiKeyStatus.style.color = 'var(--color-success)';
+      
+      // Update the status display
+      this.updateApiKeyStatus();
+      
+      // Close the modal after a short delay
+      setTimeout(() => {
+        this.closeApiKeyModal();
+        this.apiKeyStatus.textContent = '';
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving API key:', error);
+      this.apiKeyStatus.textContent = 'Error saving API key.';
+      this.apiKeyStatus.style.color = 'var(--color-recording)';
+    }
+  }
+
+  private clearApiKey(): void {
+    // Remove API key from localStorage
+    localStorage.removeItem('gemini_api_key');
+    
+    // Clear the input field
+    this.apiKeyInput.value = '';
+    
+    // Revert to the environment variable API key
+    this.genAI = new GoogleGenAI({
+      apiKey: process.env.API_KEY!,
+      apiVersion: 'v1alpha',
+    });
+    
+    // Update status
+    this.apiKeyStatus.textContent = 'API key cleared. Using default key.';
+    this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+    
+    // Update the status display
+    this.updateApiKeyStatus();
+  }
+
+  private updateApiKeyStatus(): void {
+    const storedApiKey = localStorage.getItem('gemini_api_key');
+    
+    if (storedApiKey) {
+      this.settingsButton.setAttribute('title', 'Settings (Using Custom API Key)');
+      // Add a visual indicator that a custom key is being used
+      this.settingsButton.classList.add('custom-key-active');
+    } else {
+      this.settingsButton.setAttribute('title', 'Settings (Using Default API Key)');
+      this.settingsButton.classList.remove('custom-key-active');
     }
   }
 }

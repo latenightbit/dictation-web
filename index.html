@@ -90,6 +90,10 @@
             <button class="action-button" id="uploadButton" title="Upload Audio File">
               <i class="fas fa-upload"></i>
             </button>
+            
+            <button class="action-button" id="settingsButton" title="Settings">
+              <i class="fas fa-cog"></i>
+            </button>
           </div>
 
           <!-- Hidden file input for audio upload -->
@@ -99,6 +103,29 @@
     </div>
 
     <div id="micStatus" class="debug-panel"></div>
+
+    <!-- API Key Modal -->
+    <div id="apiKeyModal" class="modal">
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>API Key Settings</h2>
+        <p>Enter your Gemini API key to use this app with your own credentials.</p>
+        <div class="api-key-form">
+          <label for="apiKeyInput">Gemini API Key:</label>
+          <input type="password" id="apiKeyInput" placeholder="Enter your API key">
+          <div class="api-key-controls">
+            <button id="saveApiKeyButton">Save</button>
+            <button id="clearApiKeyButton">Clear</button>
+          </div>
+        </div>
+        <div class="api-key-status">
+          <span id="apiKeyStatus"></span>
+        </div>
+        <div class="get-api-key-info">
+          <p>Don't have an API key? <a href="https://ai.google.dev/tutorials/setup" target="_blank">Get one here</a></p>
+        </div>
+      </div>
+    </div>
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {

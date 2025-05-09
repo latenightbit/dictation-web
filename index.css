@@ -539,3 +539,155 @@ body.light-mode .record-button.recording .record-button-inner { color: white; }
     height: 56px;
   }
 }
+
+/* API Key Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  background: var(--glass-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  margin: 15% auto;
+  padding: 25px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text);
+  position: relative;
+}
+
+.close-modal {
+  color: var(--color-text-tertiary);
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.close-modal:hover {
+  color: var(--color-text);
+}
+
+.modal h2 {
+  margin-top: 0;
+  color: var(--color-text);
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+}
+
+.api-key-form {
+  margin: 20px 0;
+}
+
+.api-key-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.api-key-form input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.api-key-form input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.api-key-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.api-key-controls button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: all var(--transition-fast);
+}
+
+#saveApiKeyButton {
+  background-color: var(--color-accent);
+  color: white;
+  flex: 1;
+}
+
+#clearApiKeyButton {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--glass-border);
+}
+
+#saveApiKeyButton:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+#clearApiKeyButton:hover {
+  background-color: var(--color-surface-hover);
+  transform: translateY(-1px);
+}
+
+.api-key-status {
+  margin-top: 15px;
+  font-size: 14px;
+  min-height: 20px;
+}
+
+.get-api-key-info {
+  margin-top: 25px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.get-api-key-info a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.get-api-key-info a:hover {
+  text-decoration: underline;
+}
+
+/* Custom API key indicator */
+.custom-key-active {
+  position: relative;
+}
+
+.custom-key-active::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background-color: var(--color-success);
+  border-radius: 50%;
+  border: 2px solid var(--color-bg);
+}
