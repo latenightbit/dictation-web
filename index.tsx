@@ -46,6 +46,10 @@ class VoiceNotesApp {
   private waveformDrawingId: number | null = null;
   private timerIntervalId: number | null = null;
   private recordingStartTime: number = 0;
+  
+  // New properties for file upload
+  private uploadButton: HTMLButtonElement;
+  private audioFileInput: HTMLInputElement;
 
   constructor() {
     this.genAI = new GoogleGenAI({
@@ -88,6 +92,14 @@ class VoiceNotesApp {
     this.liveRecordingTimerDisplay = document.getElementById(
       'liveRecordingTimerDisplay',
     ) as HTMLDivElement;
+    
+    // Initialize upload controls
+    this.uploadButton = document.getElementById(
+      'uploadButton'
+    ) as HTMLButtonElement;
+    this.audioFileInput = document.getElementById(
+      'audioFileInput'
+    ) as HTMLInputElement;
 
     if (this.liveWaveformCanvas) {
       this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
@@ -118,6 +130,10 @@ class VoiceNotesApp {
     this.newButton.addEventListener('click', () => this.createNewNote());
     this.themeToggleButton.addEventListener('click', () => this.toggleTheme());
     window.addEventListener('resize', this.handleResize.bind(this));
+    
+    // Add event listeners for file upload
+    this.uploadButton.addEventListener('click', () => this.audioFileInput.click());
+    this.audioFileInput.addEventListener('change', (event) => this.handleFileUpload(event));
   }
 
   private handleResize(): void {
@@ -555,7 +571,7 @@ class VoiceNotesApp {
       this.recordingStatus.textContent = 'Getting transcription...';
 
       const contents = [
-        {text: 'Generate a complete, detailed transcript of this audio. Provide transcript only, no other text or comments.'},
+        {text: '"Please transcribe the following audio verbatim. Provide only the text content."'},
         {inlineData: {mimeType: mimeType, data: base64Audio}},
       ];
 
@@ -627,7 +643,7 @@ class VoiceNotesApp {
       const prompt = `Take this raw transcription and create a polished, well-formatted note.
                     Remove filler words (um, uh, like), repetitions, and false starts.
                     Format any lists or bullet points properly. Use markdown formatting for headings, lists, etc.
-                    Maintain all the original content and meaning. Provide note only, no other text or comments.
+                    Maintain all the original content and meaning. Provide note only. Do not provide no other text or comments.
 
                     Raw transcription:
                     ${this.rawTranscription.textContent}`;
@@ -770,6 +786,37 @@ class VoiceNotesApp {
       this.recordButton.classList.remove('recording');
     } else {
       this.stopLiveDisplay();
+    }
+  }
+
+  // Add a new method to handle file uploads
+  private async handleFileUpload(event: Event): Promise<void> {
+    const target = event.target as HTMLInputElement;
+    const files = target.files;
+    
+    if (!files || files.length === 0) {
+      return;
+    }
+    
+    const audioFile = files[0];
+    
+    // Check if the file is an audio file
+    if (!audioFile.type.startsWith('audio/')) {
+      this.recordingStatus.textContent = 'Please select an audio file.';
+      return;
+    }
+    
+    this.recordingStatus.textContent = 'Processing uploaded audio...';
+    
+    try {
+      // Process the uploaded audio file
+      await this.processAudio(audioFile);
+      
+      // Reset the file input for future uploads
+      this.audioFileInput.value = '';
+    } catch (error) {
+      console.error('Error processing uploaded audio:', error);
+      this.recordingStatus.textContent = 'Error processing the audio file. Please try again.';
     }
   }
 }

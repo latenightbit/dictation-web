@@ -515,6 +515,13 @@ body.light-mode .record-button.recording .record-button-inner { color: white; }
       padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
     }
   }
+  
+  /* Adjust recording controls layout for smaller screens */
+  .recording-controls {
+    gap: 16px; /* Reduce gap between buttons on mobile */
+    flex-wrap: wrap; /* Allow buttons to wrap on very small screens */
+    justify-content: center;
+  }
 }
 
 /* Additional media query for extra small devices */
