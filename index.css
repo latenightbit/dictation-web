@@ -493,4 +493,42 @@ body.light-mode .record-button.recording .record-button-inner { color: white; }
   .live-recording-timer { font-size: 36px; }
   .action-button { width: 44px; height: 44px; font-size: 16px; }
   .record-button { width: 64px; height: 64px; }
+
+  /* Fix for mobile controls visibility */
+  .recording-interface {
+    height: var(--footer-height);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  .main-content {
+    padding-bottom: var(--footer-height);
+  }
+  
+  /* Adjust for notched iPhones */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .recording-interface {
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+    }
+  }
+}
+
+/* Additional media query for extra small devices */
+@media (max-width: 380px) {
+  .recording-controls {
+    gap: 16px; /* Reduce gap between buttons */
+  }
+  .action-button {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+  .record-button {
+    width: 56px;
+    height: 56px;
+  }
 }
