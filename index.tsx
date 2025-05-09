@@ -624,6 +624,8 @@ class VoiceNotesApp {
   }
 
   private async processAudio(audioBlob: Blob): Promise<void> {
+    console.log('Process audio started with blob:', audioBlob.type, audioBlob.size);
+    
     if (audioBlob.size === 0) {
       this.recordingStatus.textContent =
         'No audio data captured. Please try again.';
@@ -633,6 +635,7 @@ class VoiceNotesApp {
     
     // Check if API key is available
     if (!localStorage.getItem('gemini_api_key')) {
+      console.log('No API key in localStorage');
       this.recordingStatus.textContent = 'API key required to process audio.';
       this.openApiKeyModal();
       this.apiKeyStatus.textContent = 'An API key is required to process audio.';
@@ -642,7 +645,8 @@ class VoiceNotesApp {
     }
 
     try {
-      URL.createObjectURL(audioBlob);
+      const objectUrl = URL.createObjectURL(audioBlob);
+      console.log('Created object URL:', objectUrl);
 
       this.recordingStatus.textContent = 'Converting audio...';
 
@@ -651,26 +655,43 @@ class VoiceNotesApp {
         reader.onloadend = () => {
           try {
             const base64data = reader.result as string;
+            console.log('Audio file read, converting to base64');
             const base64Audio = base64data.split(',')[1];
             resolve(base64Audio);
           } catch (err) {
+            console.error('Error in FileReader onloadend:', err);
             reject(err);
           }
         };
-        reader.onerror = () => reject(reader.error);
+        reader.onerror = () => {
+          console.error('FileReader error:', reader.error);
+          reject(reader.error);
+        };
       });
       reader.readAsDataURL(audioBlob);
+      console.log('FileReader started');
+      
       const base64Audio = await readResult;
+      console.log('Base64 conversion complete, length:', base64Audio?.length);
 
-      if (!base64Audio) throw new Error('Failed to convert audio to base64');
+      if (!base64Audio) {
+        console.error('Base64 audio is empty or null');
+        throw new Error('Failed to convert audio to base64');
+      }
 
-      const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
+      const mimeType = this.mediaRecorder?.mimeType || audioBlob.type || 'audio/webm';
+      console.log('Using mime type for transcription:', mimeType);
       await this.getTranscription(base64Audio, mimeType);
       
       // Reset processing state after successful processing
       this.isProcessing = false;
     } catch (error) {
-      console.error('Error in processAudio:', error);
+      console.error('Detailed error in processAudio:', error);
+      if (error instanceof Error) {
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       this.recordingStatus.textContent =
         'Error processing recording. Please try again.';
       this.isProcessing = false;
@@ -682,8 +703,11 @@ class VoiceNotesApp {
     mimeType: string,
   ): Promise<void> {
     try {
+      console.log('getTranscription started with mimetype:', mimeType);
+      
       // Check if API key is available
       if (!this.genAI) {
+        console.log('genAI client not initialized in getTranscription');
         this.recordingStatus.textContent = 'API key required to get transcription.';
         this.openApiKeyModal();
         this.apiKeyStatus.textContent = 'An API key is required to transcribe audio.';
@@ -698,51 +722,72 @@ class VoiceNotesApp {
         {text: '"Please transcribe the following audio verbatim. Provide only the text content."'},
         {inlineData: {mimeType: mimeType, data: base64Audio}},
       ];
+      
+      console.log('Sending transcription request to Google Gemini API');
+      console.log('Using model:', MODEL_NAME);
+      
+      try {
+        const response = await this.genAI.models.generateContent({
+          model: MODEL_NAME,
+          contents: contents,
+        });
+        
+        console.log('Transcription response received:', response);
+        const transcriptionText = response.text;
+        console.log('Transcription text:', transcriptionText ? transcriptionText.substring(0, 100) + '...' : 'null');
 
-      const response = await this.genAI.models.generateContent({
-        model: MODEL_NAME,
-        contents: contents,
-      });
+        if (transcriptionText) {
+          this.rawTranscription.textContent = transcriptionText;
+          if (transcriptionText.trim() !== '') {
+            this.rawTranscription.classList.remove('placeholder-active');
+            console.log('Transcription complete - content added to UI');
+          } else {
+            const placeholder =
+              this.rawTranscription.getAttribute('placeholder') || '';
+            this.rawTranscription.textContent = placeholder;
+            this.rawTranscription.classList.add('placeholder-active');
+            console.log('Transcription returned empty string');
+          }
 
-      const transcriptionText = response.text;
-
-      if (transcriptionText) {
-        this.rawTranscription.textContent = transcriptionText;
-        if (transcriptionText.trim() !== '') {
-          this.rawTranscription.classList.remove('placeholder-active');
+          if (this.currentNote)
+            this.currentNote.rawTranscription = transcriptionText;
+          this.recordingStatus.textContent =
+            'Transcription complete. Polishing note...';
+          
+          console.log('Starting note polishing');
+          this.getPolishedNote().catch((err) => {
+            console.error('Error polishing note:', err);
+            this.recordingStatus.textContent =
+              'Error polishing note after transcription.';
+          });
         } else {
-          const placeholder =
-            this.rawTranscription.getAttribute('placeholder') || '';
-          this.rawTranscription.textContent = placeholder;
+          console.log('No transcription text in response');
+          this.recordingStatus.textContent =
+            'Transcription failed or returned empty.';
+          this.polishedNote.innerHTML =
+            '<p><em>Could not transcribe audio. Please try again.</em></p>';
+          this.rawTranscription.textContent =
+            this.rawTranscription.getAttribute('placeholder');
           this.rawTranscription.classList.add('placeholder-active');
         }
-
-        if (this.currentNote)
-          this.currentNote.rawTranscription = transcriptionText;
-        this.recordingStatus.textContent =
-          'Transcription complete. Polishing note...';
-        this.getPolishedNote().catch((err) => {
-          console.error('Error polishing note:', err);
-          this.recordingStatus.textContent =
-            'Error polishing note after transcription.';
-        });
-      } else {
-        this.recordingStatus.textContent =
-          'Transcription failed or returned empty.';
-        this.polishedNote.innerHTML =
-          '<p><em>Could not transcribe audio. Please try again.</em></p>';
-        this.rawTranscription.textContent =
-          this.rawTranscription.getAttribute('placeholder');
-        this.rawTranscription.classList.add('placeholder-active');
+      } catch (apiError) {
+        console.error('API error during transcription:', apiError);
+        if (apiError instanceof Error) {
+          console.error('API error name:', apiError.name);
+          console.error('API error message:', apiError.message);
+          console.error('API error stack:', apiError.stack);
+        }
+        throw apiError;
       }
     } catch (error) {
-      console.error('Error getting transcription:', error);
+      console.error('Error in getTranscription:', error);
       this.recordingStatus.textContent =
         'Error getting transcription. Please try again.';
       this.polishedNote.innerHTML = `<p><em>Error during transcription: ${error instanceof Error ? error.message : String(error)}</em></p>`;
       this.rawTranscription.textContent =
         this.rawTranscription.getAttribute('placeholder');
       this.rawTranscription.classList.add('placeholder-active');
+      this.isProcessing = false; // Make sure to reset processing flag on error
     }
   }
 
@@ -919,6 +964,8 @@ class VoiceNotesApp {
     const target = event.target as HTMLInputElement;
     const files = target.files;
     
+    console.log('File upload event triggered', files);
+    
     if (!files || files.length === 0) {
       this.recordingStatus.textContent = 'No file selected.';
       return;
@@ -926,6 +973,7 @@ class VoiceNotesApp {
     
     // Check if API key is available
     if (!this.genAI) {
+      console.log('No API key available for file upload');
       this.recordingStatus.textContent = 'API key required to process audio files.';
       this.openApiKeyModal();
       this.apiKeyStatus.textContent = 'An API key is required to process audio files.';
@@ -934,6 +982,7 @@ class VoiceNotesApp {
     }
     
     const audioFile = files[0];
+    console.log('Audio file selected:', audioFile.name, audioFile.type, audioFile.size);
     
     // Check if the file is an audio file
     if (!audioFile.type.startsWith('audio/')) {
@@ -942,16 +991,20 @@ class VoiceNotesApp {
     }
     
     this.recordingStatus.textContent = 'Processing uploaded audio...';
+    this.isProcessing = true; // Set processing flag
     
     try {
       // Process the uploaded audio file
+      console.log('Starting to process audio file');
       await this.processAudio(audioFile);
+      console.log('Finished processing audio file');
       
       // Reset the file input for future uploads
       this.audioFileInput.value = '';
     } catch (error) {
       console.error('Error processing uploaded audio:', error);
       this.recordingStatus.textContent = 'Error processing the audio file. Please try again.';
+      this.isProcessing = false; // Reset processing flag
     }
   }
 
