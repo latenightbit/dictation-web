@@ -30,6 +30,7 @@ class VoiceNotesApp {
   private themeToggleIcon: HTMLElement;
   private audioChunks: Blob[] = [];
   private isRecording = false;
+  private isProcessing = false;
   private currentNote: Note | null = null;
   private stream: MediaStream | null = null;
   private editorTitle: HTMLDivElement;
@@ -270,10 +271,27 @@ class VoiceNotesApp {
   }
 
   private async toggleRecording(): Promise<void> {
-    if (!this.isRecording) {
-      await this.startRecording();
-    } else {
-      await this.stopRecording();
+    // Prevent rapid clicking/consecutive calls
+    if (this.isProcessing) {
+      console.log('Recording operation in progress, please wait...');
+      return;
+    }
+    
+    this.isProcessing = true;
+    
+    try {
+      if (!this.isRecording) {
+        await this.startRecording();
+      } else {
+        await this.stopRecording();
+      }
+    } catch (error) {
+      console.error('Error toggling recording:', error);
+    } finally {
+      // Add a small delay before allowing another toggle
+      setTimeout(() => {
+        this.isProcessing = false;
+      }, 1000); // 1 second debounce
     }
   }
 
@@ -521,10 +539,12 @@ class VoiceNotesApp {
           this.processAudio(audioBlob).catch((err) => {
             console.error('Error processing audio:', err);
             this.recordingStatus.textContent = 'Error processing recording';
+            this.isProcessing = false;
           });
         } else {
           this.recordingStatus.textContent =
             'No audio data captured. Please try again.';
+          this.isProcessing = false;
         }
 
         if (this.stream) {
@@ -607,6 +627,7 @@ class VoiceNotesApp {
     if (audioBlob.size === 0) {
       this.recordingStatus.textContent =
         'No audio data captured. Please try again.';
+      this.isProcessing = false;
       return;
     }
     
@@ -616,6 +637,7 @@ class VoiceNotesApp {
       this.openApiKeyModal();
       this.apiKeyStatus.textContent = 'An API key is required to process audio.';
       this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+      this.isProcessing = false;
       return;
     }
 
@@ -644,10 +666,14 @@ class VoiceNotesApp {
 
       const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
       await this.getTranscription(base64Audio, mimeType);
+      
+      // Reset processing state after successful processing
+      this.isProcessing = false;
     } catch (error) {
       console.error('Error in processAudio:', error);
       this.recordingStatus.textContent =
         'Error processing recording. Please try again.';
+      this.isProcessing = false;
     }
   }
 
@@ -662,6 +688,7 @@ class VoiceNotesApp {
         this.openApiKeyModal();
         this.apiKeyStatus.textContent = 'An API key is required to transcribe audio.';
         this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+        this.isProcessing = false; // Reset processing flag
         return;
       }
       
