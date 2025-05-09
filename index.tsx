@@ -4,7 +4,9 @@
 */
 /* tslint:disable */
 
+// @ts-ignore
 import {GoogleGenAI} from '@google/genai';
+// @ts-ignore
 import {marked} from 'marked';
 
 const MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
@@ -61,12 +63,19 @@ class VoiceNotesApp {
   private apiKeyStatus: HTMLElement;
 
   constructor() {
-    // Initialize with stored API key or fallback to env variable
+    // Check for API key in localStorage
     const storedApiKey = localStorage.getItem('gemini_api_key');
-    this.genAI = new GoogleGenAI({
-      apiKey: storedApiKey || process.env.API_KEY!,
-      apiVersion: 'v1alpha',
-    });
+    
+    // Only initialize the API client if we have a key
+    if (storedApiKey) {
+      this.genAI = new GoogleGenAI({
+        apiKey: storedApiKey,
+        apiVersion: 'v1alpha',
+      });
+    } else {
+      // Without an API key, we'll initialize with a placeholder that will prompt for a key
+      this.genAI = null;
+    }
 
     this.recordButton = document.getElementById(
       'recordButton',
@@ -160,13 +169,13 @@ class VoiceNotesApp {
   }
 
   private bindEventListeners(): void {
-    this.recordButton.addEventListener('click', () => this.toggleRecording());
+    this.recordButton.addEventListener('click', () => this.checkApiKeyThen(this.toggleRecording.bind(this)));
     this.newButton.addEventListener('click', () => this.createNewNote());
     this.themeToggleButton.addEventListener('click', () => this.toggleTheme());
     window.addEventListener('resize', this.handleResize.bind(this));
     
     // Add event listeners for file upload
-    this.uploadButton.addEventListener('click', () => this.audioFileInput.click());
+    this.uploadButton.addEventListener('click', () => this.checkApiKeyThen(() => this.audioFileInput.click()));
     this.audioFileInput.addEventListener('change', (event) => this.handleFileUpload(event));
     
     // Add event listeners for API key modal
@@ -184,6 +193,26 @@ class VoiceNotesApp {
     
     // Check and display current API key status
     this.updateApiKeyStatus();
+    
+    // If no API key is found, show the API key modal after a short delay
+    setTimeout(() => {
+      if (!localStorage.getItem('gemini_api_key')) {
+        this.openApiKeyModal();
+        // Show a message indicating that an API key is required
+        this.apiKeyStatus.textContent = 'An API key is required to use this app. Get one for free from Google AI Studio.';
+        this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+      }
+    }, 500);
+  }
+
+  private checkApiKeyThen(callback: Function): void {
+    if (!localStorage.getItem('gemini_api_key')) {
+      this.openApiKeyModal();
+      this.apiKeyStatus.textContent = 'An API key is required to use this feature.';
+      this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+      return;
+    }
+    callback();
   }
 
   private handleResize(): void {
@@ -580,6 +609,15 @@ class VoiceNotesApp {
         'No audio data captured. Please try again.';
       return;
     }
+    
+    // Check if API key is available
+    if (!localStorage.getItem('gemini_api_key')) {
+      this.recordingStatus.textContent = 'API key required to process audio.';
+      this.openApiKeyModal();
+      this.apiKeyStatus.textContent = 'An API key is required to process audio.';
+      this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+      return;
+    }
 
     try {
       URL.createObjectURL(audioBlob);
@@ -618,6 +656,15 @@ class VoiceNotesApp {
     mimeType: string,
   ): Promise<void> {
     try {
+      // Check if API key is available
+      if (!this.genAI) {
+        this.recordingStatus.textContent = 'API key required to get transcription.';
+        this.openApiKeyModal();
+        this.apiKeyStatus.textContent = 'An API key is required to transcribe audio.';
+        this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+        return;
+      }
+      
       this.recordingStatus.textContent = 'Getting transcription...';
 
       const contents = [
@@ -673,21 +720,22 @@ class VoiceNotesApp {
   }
 
   private async getPolishedNote(): Promise<void> {
-    try {
-      if (
-        !this.rawTranscription.textContent ||
-        this.rawTranscription.textContent.trim() === '' ||
-        this.rawTranscription.classList.contains('placeholder-active')
-      ) {
-        this.recordingStatus.textContent = 'No transcription to polish';
-        this.polishedNote.innerHTML =
-          '<p><em>No transcription available to polish.</em></p>';
-        const placeholder = this.polishedNote.getAttribute('placeholder') || '';
-        this.polishedNote.innerHTML = placeholder;
-        this.polishedNote.classList.add('placeholder-active');
-        return;
-      }
+    if (!this.rawTranscription.textContent?.trim()) {
+      this.recordingStatus.textContent =
+        'No transcription available to polish.';
+      return;
+    }
+    
+    // Check if API key is available
+    if (!this.genAI) {
+      this.recordingStatus.textContent = 'API key required to polish note.';
+      this.openApiKeyModal();
+      this.apiKeyStatus.textContent = 'An API key is required to polish notes.';
+      this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+      return;
+    }
 
+    try {
       this.recordingStatus.textContent = 'Polishing note...';
 
       const prompt = `Take this raw transcription and create a polished, well-formatted note.
@@ -718,7 +766,7 @@ class VoiceNotesApp {
         }
 
         let noteTitleSet = false;
-        const lines = polishedText.split('\n').map((l) => l.trim());
+        const lines = polishedText.split('\n').map((l: string) => l.trim());
 
         for (const line of lines) {
           if (line.startsWith('#')) {
@@ -845,6 +893,16 @@ class VoiceNotesApp {
     const files = target.files;
     
     if (!files || files.length === 0) {
+      this.recordingStatus.textContent = 'No file selected.';
+      return;
+    }
+    
+    // Check if API key is available
+    if (!this.genAI) {
+      this.recordingStatus.textContent = 'API key required to process audio files.';
+      this.openApiKeyModal();
+      this.apiKeyStatus.textContent = 'An API key is required to process audio files.';
+      this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
       return;
     }
     
@@ -902,23 +960,20 @@ class VoiceNotesApp {
       // Save the API key to localStorage
       localStorage.setItem('gemini_api_key', apiKey);
       
-      // Update the GenAI client with the new key
+      // Initialize the API client with the new key
       this.genAI = new GoogleGenAI({
         apiKey: apiKey,
         apiVersion: 'v1alpha',
       });
       
-      // Update status and close modal
-      this.apiKeyStatus.textContent = 'API key saved successfully! Reload to apply changes.';
+      // Update UI
+      this.apiKeyStatus.textContent = 'API key saved successfully!';
       this.apiKeyStatus.style.color = 'var(--color-success)';
+      this.settingsButton.classList.add('custom-key-active');
       
-      // Update the status display
-      this.updateApiKeyStatus();
-      
-      // Close the modal after a short delay
+      // Close modal after a brief delay
       setTimeout(() => {
         this.closeApiKeyModal();
-        this.apiKeyStatus.textContent = '';
       }, 1500);
     } catch (error) {
       console.error('Error saving API key:', error);
@@ -928,24 +983,28 @@ class VoiceNotesApp {
   }
 
   private clearApiKey(): void {
-    // Remove API key from localStorage
-    localStorage.removeItem('gemini_api_key');
-    
-    // Clear the input field
-    this.apiKeyInput.value = '';
-    
-    // Revert to the environment variable API key
-    this.genAI = new GoogleGenAI({
-      apiKey: process.env.API_KEY!,
-      apiVersion: 'v1alpha',
-    });
-    
-    // Update status
-    this.apiKeyStatus.textContent = 'API key cleared. Using default key.';
-    this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
-    
-    // Update the status display
-    this.updateApiKeyStatus();
+    try {
+      // Remove API key from localStorage
+      localStorage.removeItem('gemini_api_key');
+      
+      // Clear the input field
+      this.apiKeyInput.value = '';
+      
+      // Reset the API client
+      this.genAI = null;
+      
+      // Update status
+      this.apiKeyStatus.textContent = 'API key removed. App functionality will be limited until a new key is provided.';
+      this.apiKeyStatus.style.color = 'var(--color-text-secondary)';
+      
+      // Remove custom key indicator
+      this.settingsButton.classList.remove('custom-key-active');
+      
+    } catch (error) {
+      console.error('Error clearing API key:', error);
+      this.apiKeyStatus.textContent = 'Error clearing API key.';
+      this.apiKeyStatus.style.color = 'var(--color-recording)';
+    }
   }
 
   private updateApiKeyStatus(): void {
@@ -960,10 +1019,35 @@ class VoiceNotesApp {
       this.settingsButton.classList.remove('custom-key-active');
     }
   }
+
+  public async init(): Promise<void> {
+    this.bindEventListeners();
+    this.loadTheme();
+    this.updateApiKeyStatus();
+    
+    // Check if we have an API key and update UI accordingly
+    const storedApiKey = localStorage.getItem('gemini_api_key');
+    if (storedApiKey) {
+      this.settingsButton.classList.add('custom-key-active');
+      this.recordingStatus.textContent = 'Ready to record. Click the microphone to start.';
+    } else {
+      this.recordingStatus.textContent = 'API key required. Click the settings icon to add your key.';
+    }
+  }
+
+  private loadTheme(): void {
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-theme');
+      this.themeToggleIcon.classList.remove('fa-sun');
+      this.themeToggleIcon.classList.add('fa-moon');
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  new VoiceNotesApp();
+  const app = new VoiceNotesApp();
+  app.init();
 
   document
     .querySelectorAll<HTMLElement>('[contenteditable][placeholder]')
