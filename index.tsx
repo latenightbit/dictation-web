@@ -555,7 +555,7 @@ class VoiceNotesApp {
       this.recordingStatus.textContent = 'Getting transcription...';
 
       const contents = [
-        {text: 'Generate a complete, detailed transcript of this audio.'},
+        {text: 'Generate a complete, detailed transcript of this audio. Provide transcript only, no other text or comments.'},
         {inlineData: {mimeType: mimeType, data: base64Audio}},
       ];
 
@@ -627,7 +627,7 @@ class VoiceNotesApp {
       const prompt = `Take this raw transcription and create a polished, well-formatted note.
                     Remove filler words (um, uh, like), repetitions, and false starts.
                     Format any lists or bullet points properly. Use markdown formatting for headings, lists, etc.
-                    Maintain all the original content and meaning.
+                    Maintain all the original content and meaning. Provide note only, no other text or comments.
 
                     Raw transcription:
                     ${this.rawTranscription.textContent}`;
