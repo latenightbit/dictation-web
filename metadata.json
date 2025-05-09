@@ -1,0 +1,8 @@
+{
+  "name": "Dictation App",
+  "description": "Effortless dictation powered by Gemini AI. Record thoughts, get accurate transcriptions, and beautifully polished notes automatically.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "prompt": ""
+}
